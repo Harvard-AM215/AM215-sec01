@@ -28,9 +28,20 @@ fi
 
 # Ensure the target dir for data exists
 mkdir -p raw
-# wget: -O (capital O) sets the output file; -q for quiet + show status line
-  echo "[setup] Using wget to fetch dataset -> raw/reviews_big.tsv"
+
+# Download dataset - try wget first, fall back to curl (wget isn't normally on macOS)
+echo "[setup] Downloading dataset -> raw/reviews_big.tsv"
+if command -v wget >/dev/null 2>&1; then
+  echo "[setup] Using wget..."
   wget -q --show-progress https://bit.ly/battery_reviews -O raw/reviews_big.tsv
+elif command -v curl >/dev/null 2>&1; then
+  echo "[setup] Using curl (wget not found)..."
+  curl -L --progress-bar https://bit.ly/battery_reviews -o raw/reviews_big.tsv
+else
+  echo "[setup] ERROR: Neither wget nor curl found. Please install one of them or download manually:"
+  echo "  https://bit.ly/battery_reviews -> raw/reviews_big.tsv"
+  exit 1
+fi
 
 echo "[setup] Done."
 
