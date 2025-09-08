@@ -81,9 +81,16 @@ while IFS=$'\t' read -r rid brand dp dpost; do
   [ -n "${dpost:-}" ] || continue
 
   # Convert ISO dates (YYYY-MM-DD) to seconds since epoch.
-  # `date -d "<date>" +%s` parses <date> and prints the timestamp as an integer.
-  sp=$(date -d "$dp" +%s)     || continue   # seconds at purchase
-  st=$(date -d "$dpost" +%s)  || continue   # seconds at post
+  # Portable date parsing for both Linux (GNU date) and macOS (BSD date)
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS (BSD date)
+    sp=$(date -j -f "%Y-%m-%d" "$dp" +%s 2>/dev/null) || continue
+    st=$(date -j -f "%Y-%m-%d" "$dpost" +%s 2>/dev/null) || continue
+  else
+    # Linux (GNU date)
+    sp=$(date -d "$dp" +%s 2>/dev/null) || continue
+    st=$(date -d "$dpost" +%s 2>/dev/null) || continue
+  fi
 
   # Ensure chronological order: post must be on or after purchase.
   [ "$st" -ge "$sp" ] || continue
