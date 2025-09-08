@@ -138,9 +138,7 @@ Now we use some Python code to:
 - Find the the MLE under a Gamma model for a provided dataset using `scipy.optimize.minimize`
 - Writes a report to disk
 
-**Tip:** This funciton is picky and wants explicit input and output paths. It
-doesn't have default values for these like the previous scripts did. But when it
-complains it tells you what it expects.
+The script has sensible defaults for input (`data/lifespans.tsv`) and output (`out/gamma_fit.txt`) paths, but you can override them with `--tsv` and `--out` flags if needed.
 
 ## 6) `60_plot_gamma.py` - sanity-check with two plots
 

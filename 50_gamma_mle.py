@@ -48,8 +48,8 @@ def write_report(
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tsv", required=True)
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--tsv", default="data/lifespans.tsv")
+    ap.add_argument("--out", default="out/gamma_fit.txt")
     ap.add_argument("--col", default="lifespan_months")
     args = ap.parse_args()
 
