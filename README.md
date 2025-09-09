@@ -141,7 +141,7 @@ The result is `data/lifespans.tsv`.
 Now we fit a Gamma distribution (k = shape, theta = scale). The script estimates these parameters by maximum likelihood, fixes location at 0, and writes a text report with the results.  
 
 ```bash
-python3 50_gamma_mle.py --tsv data/lifespans_Alpha.tsv --out out/gamma_Alpha.txt
+python3 50_gamma_mle.py --tsv data/lifespans.tsv --out out/gamma.txt
 ```
 
 ---
