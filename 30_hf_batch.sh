@@ -39,7 +39,7 @@
 set -euo pipefail
 
 OUT_TSV="data/failure_probs.tsv"
-CACHED="data/failure_probs.cached.tsv"
+CACHED="cached/failure_probs.cached.tsv"   # committed fallback file
 IN_TSV="data/body_for_llm.tsv"
 USE_CACHED=0
 
@@ -53,6 +53,7 @@ while [[ $# -gt 0 ]]; do
     --use-cached) USE_CACHED=1; shift ;;
     --model)
       arg_model="$2"; shift 2
+      # If the model arg is numeric, map to a preset; otherwise treat as a literal model string
       if [[ "$arg_model" =~ ^[0-9]+$ ]]; then
         case "$arg_model" in
           1) HF_MODEL="facebook/bart-large-mnli" ;;
@@ -87,18 +88,23 @@ if [[ $USE_CACHED -eq 1 ]]; then
   fi
 fi
 
-# 1) Build payload: prefix bodies with [RID=...] and use ONE label
+# -------- Step 1: Build JSON payload for classifier --------
+# We prefix each review body with [RID=...] so we can extract the ID
+# back from the API response even if review texts are similar.
+# jq -R -s : read raw input as one string and split into lines
+# split("\t"): turn each line into an array [id, body].
+# [1:-1] slice skips the header and any trailing newline.
 jq -R -s '
   split("\n")[1:-1] |
   map(split("\t")) |
   {inputs: (map("[RID=\(.[0])] " + .[1])),
    parameters:{candidate_labels:["device failure"]}}
-' data/body_for_llm.tsv > data/inputs.json
+' "$IN_TSV" > data/inputs.json
 echo "[1/3] wrote data/inputs.json"
 
-# 2) Try models in cascade
+# -------- Step 2: Try models in cascade --------
+# Start with chosen/default, then fall back to other presets if needed.
 CANDIDATES=("$HF_MODEL")
-# add other presets as fallback if different
 for alt in "facebook/bart-large-mnli" "typeform/distilbert-base-uncased-mnli" "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"; do
   if [[ "$HF_MODEL" != "$alt" ]]; then
     CANDIDATES+=("$alt")
@@ -120,6 +126,7 @@ for model in "${CANDIDATES[@]}"; do
     break
   else
     echo "[hf_batch] Failed model: $model"
+    # Subtlety: no endless retries, quickly move to next model for responsiveness
   fi
 done
 
@@ -136,7 +143,10 @@ fi
 
 echo "[2/3] wrote data/hf_raw.json"
 
-# 3) Parse probs -> TSV with header
+# -------- Step 3: Parse API JSON probabilities into TSV --------
+# API response: array of objects with fields like
+# { "sequence": "[RID=xyz] review text...", "scores": [failure_prob,...] }
+# We regex capture RID from the sequence, then output "rid<TAB>prob".
 printf "review_id\tprob_failure\n" > "$OUT_TSV"
 jq -r '
   .[] as $o
