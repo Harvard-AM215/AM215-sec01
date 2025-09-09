@@ -1,4 +1,41 @@
 #!/usr/bin/env bash
+# AM215 — Batch classification of reviews into "failure vs other"
+#
+# What it does (step by step):
+#   1) Optionally use a cached set of classifier probabilities instead of calling HF API.
+#   2) Parse input review TSV (review_id, body) and build a JSON payload with "[RID=...]" prefixes.
+#   3) Try to send the payload to Hugging Face inference API:
+#        - Use user-specified model (--model) or default (bart-large-mnli).
+#        - If that fails, cascade through other preset models (distilbert, deberta).
+#        - If all fail, fall back to committed cached probabilities file.
+#   4) Parse the API JSON response with jq, extract review_id and probability.
+#   5) Write a clean TSV with header: review_id[TAB]prob_failure.
+#
+# Inputs:
+#   data/body_for_llm.tsv
+#     -> review_id<TAB>body
+#   cached/failure_probs.cached.tsv
+#     -> optional precomputed cache (committed to repo)
+#
+# Output:
+#   data/failure_probs.tsv
+#     -> review_id<TAB>prob_failure (with header row)
+#
+# Optional flags:
+#   --use-cached       Use the cached probabilities file directly.
+#   --model {N|NAME}   Choose model by preset number or arbitrary string name.
+#                      Presets:
+#                        1 = facebook/bart-large-mnli (default, recommended)
+#                        2 = typeform/distilbert-base-uncased-mnli
+#                        3 = MoritzLaurer/mDeBERTa-v3-base-mnli-xnli
+#
+# Tools explained:
+#   set -euo pipefail     -> safer bash: exit on error/undefined var/pipefail.
+#   jq -R -s              -> read entire file as raw string; split into lines.
+#   jq capture(...)       -> extract RID from sequence field using regex.
+#   curl -sS --fail       -> HTTP POST; silent with errors; exits non-zero if fails.
+#   printf "...\n"        -> print header line to TSV.
+#
 set -euo pipefail
 
 OUT_TSV="data/failure_probs.tsv"
