@@ -59,22 +59,44 @@ jq -R -s '
 ' data/body_for_llm.tsv > data/inputs.json
 echo "[1/3] wrote data/inputs.json"
 
-# 2) Call HF once (batched), save raw JSON
-if ! curl -sS --fail -X POST "$HF_URL" \
-  -H "Authorization: Bearer $HF_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  --retry 5 --retry-delay 5 \
-  --max-time 300 \
-  -d @data/inputs.json > data/hf_raw.json; then
+# 2) Try models in cascade
+CANDIDATES=("$HF_MODEL")
+# add other presets as fallback if different
+for alt in "facebook/bart-large-mnli" "typeform/distilbert-base-uncased-mnli" "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"; do
+  if [[ "$HF_MODEL" != "$alt" ]]; then
+    CANDIDATES+=("$alt")
+  fi
+done
+
+success=0
+for model in "${CANDIDATES[@]}"; do
+  HF_URL="https://api-inference.huggingface.co/models/${model}"
+  echo "[hf_batch] Trying model: $model"
+  if curl -sS --fail -X POST "$HF_URL" \
+    -H "Authorization: Bearer $HF_API_TOKEN" \
+    -H "Content-Type: application/json" \
+    --max-time 120 \
+    -d @data/inputs.json > data/hf_raw.json; then
+    success=1
+    HF_MODEL="$model"
+    echo "[hf_batch] Success with model: $model"
+    break
+  else
+    echo "[hf_batch] Failed model: $model"
+  fi
+done
+
+if [[ $success -eq 0 ]]; then
   if [[ -s "$CACHED" ]]; then
     cp "$CACHED" "$OUT_TSV"
-    echo "[hf_batch] HF API failed, fell back to cached $CACHED"
+    echo "[hf_batch] All models failed, using cached $CACHED"
     exit 0
   else
-    echo "[hf_batch] HF API failed and no cache found" >&2
+    echo "[hf_batch] All models failed and no cache found" >&2
     exit 1
   fi
 fi
+
 echo "[2/3] wrote data/hf_raw.json"
 
 # 3) Parse probs -> TSV with header
