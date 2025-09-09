@@ -2,3 +2,5 @@
 data
 raw
 out
+
+# Note: cached/ directory is intentionally tracked for committed fallback files
