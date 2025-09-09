@@ -1,223 +1,189 @@
 # AM215 Section: From Messy Reviews to Battery Lifespans
 
-In these example we'll be modeling the lifespans of laptop batteries
-from two different brands, Alpha and Beta, using text review data. The
-underlying model assumes a Gamma distribution which has a location and
-a parameter. We'll use `scipy.optimize.minimize` to find the MLE and
-generate some visualizations, but the data messy and not simply
-a collection of lifespan values.
+In this section we will practice taking messy online reviews and turning them into something a statistician can actually work with. The goal is to estimate the distribution of laptop battery lifespans for two brands, Alpha and Beta.  
 
-Think of this as a little data assembly line. We start with raw text
-reviews data, clean just what we need, ask a model which reviews
-probably describe a failure, turn "time owned" into "lifespan" for
-those, and then fit a simple Gamma model brand-by-brand.
+We will walk through a series of small scripts, each focused on a single step. By stringing them together you create a tidy dataset, fit a Gamma model brand by brand, and visualize the results.  
 
-The point of this example is **not** to memorize every command, flag,
-or quirk of syntax. It’s to get comfortable interacting with the
-terminal, reading scripts, and seeing how different components can be
-strung together into a pipeline.
-
-You should be glancing through each script, but don't get hung up on
-the details. It's more important to know what the purpose of the
-script is.
-
-## Before you start
-
-Make sure you've created an account Hugging Face account on huggingface.co
-
-If you’re logged into the Harvard server, request a compute node:
-`srun -p general --pty bash` 
-
-You'll need a Hugging Face API token to query the classifier
-model. So create an account on huggingface.co
-
-View this README.md with `less` (`q` to quit) or `vim` (`esc` then `:q!` to quit!)
-    - scroll up/down with `j`/`k`
-    - search with `/`
-
-**Pro tip:** You can put a program in the background with `ctrl+Z` and then
-foreground it with `fg`. This is nice because you won't lose your place in the
-document when you go back and forth between reading and working in the command line. We'll
-look at a more powerful solution (multiplexers like `screen` and `tmux`) another
-time.
-
-
-## Gamma Model of Battery Lifespans from Written Reviews
-
-0. `00_setup.sh`
-
-This first script makes sure we have the Python packages we'll need at
-the end. If any of the dependencies are missing it will create
-a virtual environment and install them there. If it does, be
-sure to run the command you're shown to activate the environment. 
-
-Then it pulls data from the web with `wget` and write it to `./raw/reviews.tsv`.
-
-You can inspect the data with the `head` command.
-`head -n 1` will just show the first line (the column headers).
-You can use `wc -l` to count the rows in the file (e.g., n reviews + 1) 
-
-**TODO**
-To speed things up for now, make a subset of the data by redirecting the
-ouput of `head` to a new file:
-`head -n 51 > ./raw/reviews.tsv`
-This file has the first 50 reviews and this path is what the other
-scripts will use as their default data input unless you give them a
-different argument.
-
-Let's proceed!
-
-## 1) `10_clean.sh`
-
-The data set has some Windows carriage return characters. This script filters
-theme out with `sed`.
-It then extracts only the columns we care about with `cut`.
-Finally, it writes three new data files. You should inspect them with head.
-
-**The next scripts become more complex!** But part of that complexity the
-implementation of a `--help` flag you can you when calling them to see how they
-are used and/or what arguments and flags they take.
-
-## 2) `20_make_ownership_lengths.sh`
-
-We have the purchase dates and review dates in the new `./data/local_dates.tsv`,
-so with this script we calculate how many months the reviewer has owned the battery before
-they made their post.
-
-## 3) `30_hf_batch.sh`
-
-We have ownership lengths and review texts. But not all reviews are about
-battery failures or anything negative at all.
-We can use a transformer classifier to give us the probability of a review being
-about a battery failure. Hugging Face allows us to sent queries to various
-transformers through their API, but we need an API key. This script expects that
-token to be in an environment variable called "HF_API_TOKEN".
+The point of this exercise is **not** memorizing shell flags or every line of code. The point is to get comfortable moving data step by step, reading scripts, and seeing how the parts line up into a pipeline.  
 
 ---
-### Offline / Cached Results
 
-Sometimes the free Hugging Face inference endpoints are slow or return
-timeout errors. To let you keep going, we provide a cached set of classifier
-outputs under:
+## Quick Pipeline Overview
 
+Think of this as our assembly line:
+
+0. `00_setup.sh` -> check/install Python packages and download the dataset  
+1. `10_clean.sh` -> clean up raw reviews and extract relevant columns  
+2. `20_make_ownership_lengths.sh` -> compute length of ownership between purchase and post dates  
+3. `30_hf_batch.sh` -> send review text to a Hugging Face classifier for failure probabilities  
+4. `40_build_lifespans.sh` -> keep only likely failures, call them lifespans  
+5. `50_gamma_mle.py` -> fit Gamma parameters (MLE) for one brand’s lifespans  
+6. `60_plot_gamma.py` -> plot histogram+fit and log-likelihood contour  
+7. `99_run_pipeline.sh` -> run the whole thing and write reports + plots  
+
+Each script also has a `--help` option and plenty of comments inside.
+
+---
+
+## Before You Begin
+
+Several steps rely on Hugging Face, which provides access to transformer models.  
+**STUDENT TODO:** Make a free account at https://huggingface.co before starting this section.  
+
+(We will deal with generating and using a token later when we reach step 30; for now, all you need is the account itself so you will not be delayed later.)
+
+---
+
+## Step by Step Walkthrough
+
+### 0) `00_setup.sh`
+
+This script checks for Python packages we will need at the end (`numpy, scipy, matplotlib, pandas`). If they are missing, it creates a virtual environment (`am215-venv`) and installs them.  
+
+**STUDENT TODO:** if you see that it created a virtual environment, you need to activate it in your current shell:  
+```bash
+source am215-venv/bin/activate
 ```
-data/failure_probs.cached.tsv
+
+It will also download the full dataset to `raw/reviews_big.tsv`.  
+
+**STUDENT TODO:** For speed while learning, make a smaller file containing only the first 50 reviews:  
+```bash
+head -n 51 raw/reviews_big.tsv > raw/reviews.tsv
 ```
 
-You can tell the script to use this file instead of calling the API by running:
+All later scripts will look for `raw/reviews.tsv` by default.
 
+---
+
+### 1) `10_clean.sh`
+
+The raw file has some quirks (Windows carriage returns, too many columns). This script cleans it up and leaves you with three neat TSV files in `data/`:  
+- `reviews_ascii.tsv`  
+- `local_dates.tsv`  
+- `body_for_llm.tsv`
+
+Try running:  
+```bash
+./10_clean.sh
+head data/reviews_ascii.tsv
 ```
+
+---
+
+### 2) `20_make_ownership_lengths.sh`
+
+Now we compute how long each customer owned the battery before they wrote the review. It uses purchase and post dates, measures the gap in months, and writes the result into `data/ownership_lengths.tsv`.  
+
+```bash
+./20_make_ownership_lengths.sh
+```
+
+---
+
+### 3) `30_hf_batch.sh`
+
+Not every review talks about a failure. This script asks a Hugging Face classifier to decide, for each review, the probability that it really describes a battery failure. The output is `data/failure_probs.tsv`.  
+
+Before you can run it, you need an API token. You already created a free account earlier — now it is time to generate a token and load it into your shell.  
+
+**STUDENT TODO:**  
+1. In your Hugging Face profile, go to **Settings -> Access Tokens**.  
+2. Create a new token of type **Read**. Give it a name like *am215-demo*.  
+3. In your terminal, create a safe directory and file:  
+   ```bash
+   mkdir -p ~/.secrets
+   nano ~/.secrets/hf_token
+   ```  
+   Paste your token into that file, save, and quit the editor.  
+4. Back in your shell, load it into the environment:  
+   ```bash
+   export HF_API_TOKEN=$(cat ~/.secrets/hf_token)
+   ```  
+   This will last for your current shell session only. If you close the terminal, export it again next time.  
+5. If you want it to be permanent, add the same export line to your `~/.bashrc` or `~/.bash_profile` using the absolute path to the file.  
+
+Now you are ready to classify reviews:  
+
+```bash
+./30_hf_batch.sh
+```
+
+If the API is slow or returns errors, you can use the committed cached results instead:  
+
+```bash
 ./30_hf_batch.sh --use-cached
 ```
 
-Or, when running the full pipeline:
+You can also try different models:  
+- `--model 1` -> facebook/bart-large-mnli (default, reliable)  
+- `--model 2` -> typeform/distilbert-base-uncased-mnli  
+- `--model 3` -> MoritzLaurer/mDeBERTa-v3-base-mnli-xnli  
 
-```
-./99_run_pipeline.sh --use-cached
-```
-
-If you do not pass `--use-cached` but the API call fails, the script will
-automatically fall back to the cached file if it exists.
-
-### Switching Models
-
-To experiment with different classifiers, you can use presets or a custom
-model string. Presets:
-
-1 -> facebook/bart-large-mnli (default, recommended)  
-2 -> typeform/distilbert-base-uncased-mnli  
-3 -> MoritzLaurer/mDeBERTa-v3-base-mnli-xnli  
-
-Examples:
-```
-./30_hf_batch.sh --model 1        # uses bart-large-mnli
-./30_hf_batch.sh --model 2        # uses distilbert variant
-./30_hf_batch.sh --model myorg/my-custom-model
-```
-
-You can also override via an environment variable:
-```
-HF_MODEL=facebook/bart-large-mnli ./30_hf_batch.sh
-```
-
-Downstream scripts always read `data/failure_probs.tsv` as their input,
-regardless of whether it was produced live or copied from a cache.
-
-**TODO**
-- Create an account on huggingface.co
-- Go to huggingface.co/settings/tokens and "Create a Token"
-- Select "Read" for token type and call it something like "AM215-sec01" 
-- With `nano` or `vim` edit a new file `hf_token` and paste in your token
-**Tip**: You can paste into the Harvard terminal in your browser by right-clicking (or
-two-finger tap) 
-
-Now run:
-`export HF_API_TOKEN="$(cat hf_token)"`
-
-**Tip:** If you want to use this token in the future, you could add a line like
-this to `~/.bashrc`, but use an absolute path to the token. You might also want
-to `mv` the file to a new directory you create for tokens (e.g., `mkdir ~/.secrets`).
-We'll talk more about how best to handle 'secrets' in the future. 
+Or specify a Hugging Face model name directly.
 
 ---
 
-You can test it by playing with `hf_example.sh`. Give it a string as an argument and it will
-ask the classifier what it thinks the probability of this being a about product failure.
+### 4) `40_build_lifespans.sh`
 
-The main programs used in the script ar `jq` for JSON parsing and `curl` for
-sending our query to the endpoint.
+This combines ownership lengths with review probabilities. Reviews above a chosen threshold are kept as lifespans, others are discarded.  
 
-The main batch script sends many reviews at once to the classifier and writes
-what is returned in a new data file.
+```bash
+./40_build_lifespans.sh --thr 0.9
+```
 
-## 4) `40_build_lifespans.sh` 
+The result is `data/lifespans.tsv`.
 
-With the probabilities of a review being about a failure, we can choose a
-threshold and consider every review with a predicted probability above it to have
-been a failure. These reviews' 'ownership length' will now be interpreted as a
-lifespan (we assume the reviewer posted not long after the failure). All other
-reviews below the probability are discarded. We now have a dataset of lifespans!
+---
 
-Try the `--help` flag to see how you might adjust the threshold.
+### 5) `50_gamma_mle.py`
 
-## 5) `50_gamma_mle.py`
+Now we fit a Gamma distribution (k = shape, theta = scale). The script estimates these parameters by maximum likelihood, fixes location at 0, and writes a text report with the results.  
 
-Now we use some Python code to:
-- Find the the MLE under a Gamma model for a provided dataset using `scipy.optimize.minimize`
-- Writes a report to disk
+```bash
+python3 50_gamma_mle.py --tsv data/lifespans_Alpha.tsv --out out/gamma_Alpha.txt
+```
 
-The script has sensible defaults for input (`data/lifespans.tsv`) and output (`out/gamma_fit.txt`) paths, but you can override them with `--tsv` and `--out` flags if needed.
+---
 
-## 6) `60_plot_gamma.py` - sanity-check with two plots
+### 6) `60_plot_gamma.py`
 
-Pictures help. We plot a data histogram + fitted PDF and a log-likelihood contour around the MLE..
-This script saves plots of:
-- Gamma model's distribution compared to the data distribution
-- MLE and contour plot of log-likelihood as a function of the parameter values
+There is no substitute for looking at the results. This script produces both a histogram of the data with the fitted Gamma overlay, and a contour plot of the log likelihood in (k, theta).  
 
-**Tip:**  This script takes many arguments, so make use of `--help` if you want to try
-calling it on its own, or we can use the pipeline which is next (and last)!
+```bash
+python3 60_plot_gamma.py \
+  --tsv data/lifespans_Alpha.tsv \
+  --k 2.0 --theta 4.0 \
+  --title "Alpha lifespans - Gamma fit" \
+  --outprefix out/alpha
+```
 
-## `99_pipeline.sh` - One-button pipeline (small, then big)
+Check the .png files in `out/`.
 
-This pipeline chains together everything we've done so far and also separates
-the data for the two Brands so we have the results of our MLE Gamma model for
-each.
+---
 
-It cleans, computes ownership length, classifies reviews, builds lifespans, splits by brand, fits Gamma, and makes the two plots per brand.
+### 7) `99_run_pipeline.sh`
 
-Use its `--help` to see what arguments and flags it accepts.
+Finally, you can run the entire pipeline in one go. By default it will clean, calculate ownership, classify failures, build lifespans, fit Gamma distributions, and produce plots for both brands.  
 
-Run the pipline, which again by default is using our small subset of the full
-data, and inspect the output. You can try playing with the threshold as well.
+```bash
+./99_run_pipeline.sh
+```
 
-Then tell the pipeline to use `./raw/reviews_big.tsv` as the input.
-It can take a minute, especially with the calls to the free transformer
-classifier. Now inspect your results.
+If the Hugging Face endpoint is failing, add `--use-cached`:  
 
-## Wrap up
+```bash
+./99_run_pipeline.sh --use-cached
+```
 
-If you are curious, there is a file in one of the directories that demonstrates process by which the reviews were generated.
-Did you recover the parameters of the true data generating process?
+---
 
-You should also take a look at the AM115 Colab notebook linked on Canvas.
+## Wrap Up
+
+When the pipeline finishes, look in the `out/` directory. You should see:  
+- Reports: `gamma_Alpha.txt`, `gamma_Beta.txt`  
+- Plots: `alpha_hist.png`, `alpha_llcontour.png`, and equivalents for Beta  
+
+Think about whether the parameters your Gamma fits recovered resemble the true generating process. How sensitive were results to your choice of classification threshold?  
+
+When you want coding details, look inside the scripts; their headers and comments explain the mechanics (awk, jq, curl, numpy, etc). The README is here only to give you the map of the journey.
