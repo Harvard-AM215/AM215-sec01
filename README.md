@@ -69,10 +69,10 @@ Let's proceed!
 
 ## 1) `10_clean.sh`
 
-The data set has some Windows carriage return characters. But we can filter
-these out with `sed`.
-It also extracts only the columns we care about with `cut`.
-It write three new data files. You should inspect them with head.
+The data set has some Windows carriage return characters. This script filters
+theme out with `sed`.
+It then extracts only the columns we care about with `cut`.
+Finally, it writes three new data files. You should inspect them with head.
 
 **The next scripts become more complex!** But part of that complexity the
 implementation of a `--help` flag you can you when calling them to see how they
