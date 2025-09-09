@@ -30,7 +30,7 @@ Each script also has a `--help` option and plenty of comments inside.
 Several steps rely on Hugging Face, which provides access to transformer models.  
 **STUDENT TODO:** Make a free account at https://huggingface.co before starting this section.  
 
-(We will deal with generating and using a token later when we reach step 30; for now, all you need is the account itself so you will not be delayed later.)
+(We will deal with generating and using a token later; for now, all you need is the account itself so you will not be delayed later.)
 
 ---
 
