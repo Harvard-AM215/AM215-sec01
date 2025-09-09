@@ -63,7 +63,7 @@ echo "[1/3] wrote data/inputs.json"
 if ! curl -sS --fail -X POST "$HF_URL" \
   -H "Authorization: Bearer $HF_API_TOKEN" \
   -H "Content-Type: application/json" \
-  --retry 5 --retry-delay 5 --retry-on-http-error 429,500,502,503,504 \
+  --retry 5 --retry-delay 5 \
   --max-time 300 \
   -d @data/inputs.json > data/hf_raw.json; then
   if [[ -s "$CACHED" ]]; then
