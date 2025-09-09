@@ -28,10 +28,10 @@ Make sure you've created an account Hugging Face account on huggingface.co
 If you’re logged into the Harvard server, request a compute node:
 `srun -p general --pty bash` 
 
-The you'll need a Hugging Face API token to query the classifier
+You'll need a Hugging Face API token to query the classifier
 model. So create an account on huggingface.co
 
-OK! View this README.md with `less` (`q` to quit) or `vim` (`esc` then `:q!` to quit!)
+View this README.md with `less` (`q` to quit) or `vim` (`esc` then `:q!` to quit!)
     - scroll up/down with `j`/`k`
     - search with `/`
 
