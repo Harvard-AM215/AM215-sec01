@@ -1,4 +1,33 @@
 #!/usr/bin/env bash
+# AM215 — Simple Hugging Face API example
+#
+# What this does (step by step):
+#   1) Take one review text (argument $1); default string if none provided.
+#   2) Build a JSON payload with the review text and one candidate label ("device failure").
+#   3) Print the example curl command so students can see the raw request.
+#   4) Actually POST the payload to the Hugging Face model inference API.
+#   5) Save the raw JSON response and extract the device-failure probability.
+#
+# Inputs:
+#   - Environment variable HF_API_TOKEN (must be set).
+#   - One optional command-line argument: a review text.
+#
+# Outputs:
+#   - Echoes an example curl command shape to stdout.
+#   - Writes raw JSON response to /tmp/hf_example_raw.json.
+#   - Prints the extracted failure probability to stdout.
+#
+# Notes:
+#   - Defaults to using: MoritzLaurer/mDeBERTa-v3-base-mnli-xnli
+#   - You can edit the MODEL variable to try another Hugging Face model ID.
+#   - jq -n is used here to safely construct JSON with proper quoting.
+#
+# Tools explained:
+#   set -euo pipefail   -> safer bash (exit on error/undefined vars/pipefail).
+#   jq -n --arg text …  -> construct JSON safely, inserting shell vars.
+#   curl -sS -X POST    -> run an HTTPS POST; -sS quiet with errors visible.
+#   tee                 -> copy output both to file and stdout.
+#   jq -r '…'           -> parse JSON and extract the score field.
 set -euo pipefail
 : "${HF_API_TOKEN:?export HF_API_TOKEN=...}"
 
