@@ -94,6 +94,54 @@ transformers through their API, but we need an API key. This script expects that
 token to be in an environment variable called "HF_API_TOKEN".
 
 ---
+### Offline / Cached Results
+
+Sometimes the free Hugging Face inference endpoints are slow or return
+timeout errors. To let you keep going, we provide a cached set of classifier
+outputs under:
+
+```
+data/failure_probs.cached.tsv
+```
+
+You can tell the script to use this file instead of calling the API by running:
+
+```
+./30_hf_batch.sh --use-cached
+```
+
+Or, when running the full pipeline:
+
+```
+./99_run_pipeline.sh --use-cached
+```
+
+If you do not pass `--use-cached` but the API call fails, the script will
+automatically fall back to the cached file if it exists.
+
+### Switching Models
+
+To experiment with different classifiers, you can use presets or a custom
+model string. Presets:
+
+1 -> facebook/bart-large-mnli (default, recommended)  
+2 -> typeform/distilbert-base-uncased-mnli  
+3 -> MoritzLaurer/mDeBERTa-v3-base-mnli-xnli  
+
+Examples:
+```
+./30_hf_batch.sh --model 1        # uses bart-large-mnli
+./30_hf_batch.sh --model 2        # uses distilbert variant
+./30_hf_batch.sh --model myorg/my-custom-model
+```
+
+You can also override via an environment variable:
+```
+HF_MODEL=facebook/bart-large-mnli ./30_hf_batch.sh
+```
+
+Downstream scripts always read `data/failure_probs.tsv` as their input,
+regardless of whether it was produced live or copied from a cache.
 
 **TODO**
 - Create an account on huggingface.co

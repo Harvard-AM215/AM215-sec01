@@ -7,13 +7,16 @@ set -euo pipefail
 THR="${THR:-0.9}"
 REPORTS_ONLY=0
 INPUT_PATH=""
+EXTRA_30_ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --thr) THR="$2"; shift 2 ;;
     --input) INPUT_PATH="$2"; shift 2 ;;
     --reports-only) REPORTS_ONLY=1; shift ;;
+    --use-cached) EXTRA_30_ARGS+=("--use-cached"); shift ;;
+    --model) EXTRA_30_ARGS+=("--model" "$2"); shift 2 ;;
     -h|--help)
-      echo "Usage: $(basename "$0") [--thr FLOAT] [--input PATH] [--reports-only]"
+      echo "Usage: $(basename "$0") [--thr FLOAT] [--input PATH] [--reports-only] [--use-cached] [--model NAME]"
       echo "Defaults: THR=$THR"
       echo "Note: --input not allowed with --reports-only"
       exit 0
@@ -34,7 +37,7 @@ if [[ "$REPORTS_ONLY" -eq 0 ]]; then
   ./20_make_ownership_lengths.sh  # or scripts/30_make_ownership_lengths.sh if you kept that name
 
   # 30) batch HF classification (single label: "device failure")
-  ./30_hf_batch.sh
+  ./30_hf_batch.sh "${EXTRA_30_ARGS[@]}"
 else
   if [[ -n "$INPUT_PATH" ]]; then
     echo "[pipeline] ERROR: --input not allowed with --reports-only" >&2
