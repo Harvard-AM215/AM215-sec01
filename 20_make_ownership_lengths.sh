@@ -11,7 +11,7 @@
 #   - We use `date -d "<YYYY-MM-DD>" +%s` to convert a date to "seconds since epoch".
 #   - We use `bc -l` for floating point division (bash only does integers).
 #   - We skip rows with missing/bad dates or where post < purchase.
-#   - On macOS, `date -d` is not available; run this on Linux (cluster) or use `gdate`.
+#   - We check $OSTYPE to see which `date` program is available GNU (Linux) or BSD (macOS)
 #
 # Optional flags:
 #   --in <path>     (default: data/local_dates.tsv)
