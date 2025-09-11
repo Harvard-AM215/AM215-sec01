@@ -152,9 +152,9 @@ There is no substitute for looking at the results. This script produces both a h
 
 ```bash
 python3 60_plot_gamma.py \
-  --tsv data/lifespans_Alpha.tsv \
+  --tsv data/lifespans.tsv \
   --k 2.0 --theta 4.0 \
-  --title "Alpha lifespans - Gamma fit" \
+  --title "lifespans - Gamma fit" \
   --outprefix out/alpha
 ```
 
